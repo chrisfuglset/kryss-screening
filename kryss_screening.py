@@ -63,6 +63,10 @@ NVDB_KLIENT = "kryss-screening"
 NORGE_BOKS = box(4.0, 57.8, 31.5, 71.5)  # grov boks (lon/lat), bare for en advarsel
 # Gatenettet hentes så langt utenfor området at kryss på grensen får alle armene sine
 KANTSONE_M = 200
+# Merke i GeoPackage-fila som viser at skriptet har laget den og trygt kan overskrive den
+STIL_BESKRIVELSE = "Laget av kryss_screening.py"
+KRYSS_KOLONNER = ["kryss_id", "krysstype", "antall_armer", "hoyeste_vegklasse", "maks_fart",
+                  "antall_ulykker"]
 
 STANDARDVERDIER = {
     "omrade": {"sted": "", "polygon_fil": "", "polygon_lag": "", "boks": []},
@@ -477,30 +481,66 @@ def bygg_inn_stiler(ut: Path, lagnavn: list[str]) -> None:
             "f_table_catalog": "", "f_table_schema": "", "f_table_name": lag,
             "f_geometry_column": pyogrio.read_info(ut, layer=lag)["geometry_name"],
             "styleName": lag, "styleQML": qml.read_text(encoding="utf-8"), "styleSLD": "",
-            "useAsDefault": True, "description": "Laget av kryss_screening.py",
+            "useAsDefault": True, "description": STIL_BESKRIVELSE,
             "owner": "", "ui": "", "update_time": time.strftime("%Y-%m-%dT%H:%M:%S"),
         })
     if rader:
         pyogrio.write_dataframe(pd.DataFrame(rader), ut, layer="layer_styles")
 
 
+def er_egen_gpkg(sti: Path) -> bool:
+    """Sant hvis GeoPackage-fila er laget av dette skriptet (kjennes igjen på de innebygde stilene)."""
+    try:
+        stiler = pyogrio.read_dataframe(sti, layer="layer_styles", columns=["description"],
+                                        read_geometry=False)
+    except Exception:  # ikke en GeoPackage, eller ingen stiltabell
+        return False
+    return bool((stiler["description"] == STIL_BESKRIVELSE).any())
+
+
+def er_egen_csv(sti: Path) -> bool:
+    """Sant hvis CSV-fila har nøyaktig de kolonnene skriptet skriver."""
+    try:
+        with open(sti, encoding="utf-8-sig") as f:
+            return f.readline().strip() == ";".join(KRYSS_KOLONNER)
+    except (OSError, UnicodeDecodeError):
+        return False
+
+
+def kontroller_utfil(ut: Path, overskriv: bool) -> None:
+    """
+    Stopper før noe lastes ned hvis utfilene ville erstattet filer skriptet ikke har laget selv,
+    f.eks. en egen molde.gpkg i samme mappe.
+    """
+    if ut.suffix.lower() != ".gpkg":
+        raise ValueError(f"Utfila må slutte på .gpkg (fikk «{ut.name}»).")
+    if overskriv:
+        return
+    csv = ut.with_suffix(".csv")
+    fremmede = [str(f) for f, er_egen in ((ut, er_egen_gpkg), (csv, er_egen_csv))
+                if f.exists() and not er_egen(f)]
+    if fremmede:
+        raise ValueError(
+            f"{' og '.join(fremmede)} finnes allerede og er ikke laget av dette skriptet. "
+            "Velg et annet navn med «fil» i innstillingene eller --ut, "
+            "eller bruk --overskriv hvis du vil erstatte dem.")
+
+
 def skriv_resultat(ut: Path, kryss: gpd.GeoDataFrame, ulykker: gpd.GeoDataFrame,
                    vegnett: gpd.GeoDataFrame) -> list[str]:
     if ut.exists():
-        ut.unlink()
-    kolonner = ["kryss_id", "krysstype", "antall_armer", "hoyeste_vegklasse", "maks_fart",
-                "antall_ulykker", "geometry"]
+        ut.unlink()  # kontroller_utfil har sjekket at det er trygt
     rens_for_gpkg(vegnett).to_file(ut, layer="vegnett", driver="GPKG")
     lag = ["vegnett"]
     if not ulykker.empty:
         rens_for_gpkg(ulykker).to_file(ut, layer="ulykker", driver="GPKG")
         lag.append("ulykker")
-    rens_for_gpkg(kryss[kolonner]).to_file(ut, layer="kryss", driver="GPKG")
+    rens_for_gpkg(kryss[KRYSS_KOLONNER + ["geometry"]]).to_file(ut, layer="kryss", driver="GPKG")
     lag.append("kryss")
     bygg_inn_stiler(ut, lag)
     # Semikolon og desimalkomma, slik at fila åpnes riktig i norsk Excel
-    kryss[kolonner[:-1]].to_csv(ut.with_suffix(".csv"), index=False, sep=";", decimal=",",
-                                encoding="utf-8-sig")
+    kryss[KRYSS_KOLONNER].to_csv(ut.with_suffix(".csv"), index=False, sep=";", decimal=",",
+                                 encoding="utf-8-sig")
     return lag
 
 
@@ -523,6 +563,8 @@ def les_argumenter() -> argparse.Namespace:
     p.add_argument("--ulykker-fil", help="Ulykkesdata fra fil i stedet for NVDB-APIet")
     p.add_argument("--crs", help="Koordinatsystem for resultatet, f.eks. EPSG:25833 (standard: auto)")
     p.add_argument("--ut", help="Utfil (GeoPackage). Standard: navn fra analyseområdet")
+    p.add_argument("--overskriv", action="store_true",
+                   help="Erstatt utfilene selv om de ikke er laget av dette skriptet")
     return p.parse_args()
 
 
@@ -542,10 +584,11 @@ def main() -> int:
         omrade, navn = finn_omrade(omr)
         crs = velg_crs(omrade, args.crs or utd["crs"])
         kontroller_omrade(omrade, crs, ana["maks_areal_km2"])
+        ut = Path(args.ut or utd["fil"] or f"{navn}.gpkg")
+        kontroller_utfil(ut, args.overskriv)
     except (ValueError, FileNotFoundError) as feil:
         logg(f"FEIL: {feil}")
         return 1
-    ut = Path(args.ut or utd["fil"] or f"{navn}.gpkg")
 
     omrade_utm = gpd.GeoSeries([omrade], crs=CRS_GEO).to_crs(crs)
     med_kantsone = omrade_utm.buffer(KANTSONE_M).to_crs(CRS_GEO).iloc[0]
@@ -586,16 +629,20 @@ def main() -> int:
     logg(f"  Hentet {tall(len(trafikk))} ÅDT-strekninger")
     vegnett = lag_vegnett(Gp, omrade_utm, trafikk, ana["adt_buffer_m"])
 
-    lag = skriv_resultat(ut, kryss, ulykker, vegnett)
+    try:
+        lag = skriv_resultat(ut, kryss, ulykker, vegnett)
+    except PermissionError:
+        logg(f"FEIL: Får ikke skrevet til {ut}. Er fila åpen i QGIS eller et annet program? "
+             "Lukk den, eller velg et annet navn med --ut.")
+        return 1
 
     # ---- Oppsummering ----
     print("\nKryss etter type:")
     print(kryss.groupby("krysstype").agg(kryss=("kryss_id", "size"),
                                          ulykker=("antall_ulykker", "sum")).to_string())
     print("\nTopp 15 etter antall ulykker:")
-    vis = ["kryss_id", "krysstype", "antall_armer", "hoyeste_vegklasse", "maks_fart", "antall_ulykker"]
     with pd.option_context("display.width", 200):
-        print(kryss[vis].head(15).to_string(index=False))
+        print(kryss[KRYSS_KOLONNER].head(15).to_string(index=False))
     logg(f"Ferdig. Lagene {', '.join(lag)} er skrevet til {ut} (med QGIS-stiler), "
          f"og kryssene til {ut.with_suffix('.csv')}")
     return 0

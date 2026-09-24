@@ -1,4 +1,6 @@
-osmnx>=2.0
-geopandas>=1.0
-pyogrio>=0.7
-requests
+# Øvre grenser hindrer at en ny hovedversjon installeres automatisk.
+# Testet med osmnx 2.1, geopandas 1.1, pyogrio 0.12 og requests 2.32.
+osmnx>=2.0,<3
+geopandas>=1.0,<2
+pyogrio>=0.7,<1
+requests>=2.28,<3
