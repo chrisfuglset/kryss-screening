@@ -1,0 +1,11 @@
+# Resultater
+*.gpkg
+*.gpkg-*
+*.csv
+
+# OSMnx-mellomlager
+cache/
+
+# Python
+__pycache__/
+.venv/

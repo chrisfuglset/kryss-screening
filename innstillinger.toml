@@ -1,0 +1,38 @@
+# Innstillinger for kryss_screening.py
+#
+# Endre verdiene under og kjør:   python kryss_screening.py
+# Linjer som starter med # er kommentarer og blir ikke lest.
+# Alle verdier kan også overstyres fra kommandolinjen, se  python kryss_screening.py --help
+
+
+[omrade]
+# Velg ÉN av de tre måtene å angi analyseområdet på. Kommenter ut de to andre.
+
+# 1) Stedsnavn slik OpenStreetMap forstår det: kommune, bydel, tettsted o.l.
+#    «Norway» legges til automatisk. Test gjerne navnet på https://nominatim.openstreetmap.org
+sted = "Grünerløkka, Oslo"
+
+# 2) Polygonfil (GeoPackage, GeoJSON, Shape …) tegnet i QGIS. Alle flater i laget slås sammen.
+# polygon_fil = "mitt_omrade.gpkg"
+# polygon_lag = ""          # lagnavn i GeoPackage-fila; tomt = første lag
+
+# 3) Boks i lengde-/breddegrader (WGS84): [vest, sør, øst, nord]
+# boks = [10.74, 59.91, 10.80, 59.94]
+
+
+[analyse]
+fra_aar = 0               # ta bare med ulykker fra dette året og senere (0 = alle år)
+toleranse_m = 15          # noder nærmere enn dette slås sammen til ett kryss
+radius_m = 30             # ulykker innenfor denne avstanden kobles til nærmeste kryss
+adt_buffer_m = 10         # hvor langt fra OSM-vegen en NVDB-strekning kan ligge og gi ÅDT
+maks_areal_km2 = 500      # sperre mot for store områder (hele Oslo er ca. 450 km²)
+
+
+[utdata]
+fil = ""                  # tomt = navn fra området, f.eks. grunerlokka.gpkg
+crs = "auto"              # "auto" = ETRS89 / UTM 32, 33 eller 35 etter hvor området ligger,
+                          # eller et fast system, f.eks. "EPSG:25833"
+
+
+[kilder]
+ulykker_fil = ""          # valgfritt: ulykkesdata fra fil (f.eks. fra Geonorge) i stedet for NVDB
