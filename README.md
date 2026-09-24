@@ -22,6 +22,9 @@ stiler, som kan åpnes direkte i QGIS.
 
 ## Kom i gang
 
+> **Aldri brukt terminal eller Python?** Følg [BRUKSANVISNING.md](BRUKSANVISNING.md). Den
+> forklarer alt steg for steg, fra nedlasting til ferdig kart i QGIS.
+
 ```bash
 git clone https://github.com/chrisfuglset/kryss-screening.git
 cd kryss-screening
