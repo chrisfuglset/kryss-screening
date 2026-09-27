@@ -4,9 +4,6 @@ Kobler trafikkulykker til kryss for et valgfritt område i Norge, basert på åp
 OpenStreetMap og Nasjonal vegdatabank (NVDB). Resultatet er én GeoPackage-fil med ferdige
 stiler, som kan åpnes direkte i QGIS.
 
-> **Forbehold:** Dette er en *screening* som viser hvor ulykkene samler seg. Det er ikke en
-> faglig trafikksikkerhetsvurdering. Kontroller resultatene mot flyfoto, NVDB og befaring
-> før du bruker dem i planarbeid.
 
 ## Hva skriptet gjør
 
@@ -22,8 +19,7 @@ stiler, som kan åpnes direkte i QGIS.
 
 ## Kom i gang
 
-> **Aldri brukt terminal eller Python?** Følg [BRUKSANVISNING.md](BRUKSANVISNING.md). Den
-> forklarer alt steg for steg, fra nedlasting til ferdig kart i QGIS.
+Følg [BRUKSANVISNING.md](BRUKSANVISNING.md). 
 
 ```bash
 git clone https://github.com/chrisfuglset/kryss-screening.git
@@ -166,4 +162,3 @@ avhengig av. Bruk OSGeo4W Shell og ikke et vanlig terminalvindu, ellers kan impo
 - Trafikkulykker og trafikkmengde: © Statens vegvesen, [NVDB](https://nvdb.atlas.vegvesen.no/),
   under [NLOD 2.0](https://data.norge.no/nlod/no/2.0).
 
-Oppgi kildene når du bruker eller deler resultatene.
