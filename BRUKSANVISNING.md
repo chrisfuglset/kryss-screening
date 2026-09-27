@@ -143,23 +143,28 @@ sted = "Grünerløkka, Oslo"
 1. **Linjer som starter med `#` blir ikke lest.** Å sette `#` foran en linje kalles å
    «kommentere den ut». Fjerner du `#`, blir linjen brukt.
 2. **Bare én av `sted`, `polygon_fil` og `boks` kan være i bruk.** De to andre må ha `#` foran.
-3. **Tekst skal stå i anførselstegn**, f.eks. `sted = "Molde"`. Tall skal ikke ha det.
+3. **Tekst skal stå i anførselstegn**, f.eks. `sted = "Tromsøya"`. Tall skal ikke ha det.
 
 Du kan velge område på tre måter. Den første er enklest.
 
 ### Måte 1: Stedsnavn
 
-Endre teksten mellom anførselstegnene på linjen `sted = …`. Eksempler:
+Endre teksten mellom anførselstegnene på linjen `sted = …`. Eksempler som virker:
 
 ```toml
-sted = "Molde"
-sted = "Grünerløkka, Oslo"
-sted = "Kristiansund kommune"
-sted = "Hamar sentrum"
+sted = "Grünerløkka, Oslo"     # bydel i Oslo, ca. 5 km²
+sted = "Frogner, Oslo"         # bydel i Oslo, ca. 14 km²
+sted = "Bergenhus, Bergen"     # bydel i Bergen, ca. 36 km²
+sted = "Tromsøya"              # øya med Tromsø sentrum, ca. 23 km²
 ```
 
 - «Norway» legges til automatisk, så du trenger ikke skrive det.
-- Er et navn tvetydig, legg til kommune eller fylke: `"Sentrum, Bergen"`.
+- Er et navn tvetydig, legg til kommune eller fylke, f.eks. `"Bergenhus, Bergen"`.
+- **Bynavn gir hele kommunen**, og kommuner er ofte store fordi de tar med fjell, skog og sjø.
+  `"Molde"` blir for eksempel nesten 2 000 km², og skriptet stopper ved 500 km². Vil du bare ha
+  selve byen, bruk en bydel, tegn området selv (måte 2) eller bruk en boks (måte 3).
+- Navn som «Molde sentrum» finnes ikke som område i OpenStreetMap og gir feilmelding. Bruk
+  måte 2 eller 3 for sentrumsområder.
 - Vil du sjekke at navnet blir funnet, søk på
   [nominatim.openstreetmap.org](https://nominatim.openstreetmap.org). Treffet må vises som et
   **område** på kartet, ikke som et punkt.
@@ -360,12 +365,15 @@ tabellen under.
 | `can't open file … kryss_screening.py` | Terminalen står ikke i riktig mappe. | Gå til mappen med `cd /d "…"`, se [punkt 5](#gå-til-mappen-i-terminalen). |
 | `FEIL: Angi nøyaktig én av «sted», «polygon_fil» eller «boks»` | To eller ingen av områdelinjene er i bruk. | Sørg for at nøyaktig én av dem er uten `#` foran. |
 | `TOMLDecodeError: Invalid …` | Skrivefeil i `innstillinger.toml`. | Sjekk at teksten står i anførselstegn og at stier med `\` har *enkle* anførselstegn. Linjenummeret står i meldingen. |
-| `FEIL: Nominatim geocoder returned 0 results for query …` | Stedsnavnet ble ikke funnet. | Sjekk stavemåten, eller prøv et mer presist navn, f.eks. `"Molde kommune"`. |
+| `FEIL: Nominatim geocoder returned 0 results for query …` | Stedsnavnet ble ikke funnet. | Sjekk stavemåten og søk på navnet på [nominatim.openstreetmap.org](https://nominatim.openstreetmap.org). Finnes det ikke som område, bruk måte 2 eller 3. |
 | `FEIL: Området fra stedsnavnet … er ikke en flate` | Navnet ga et punkt, ikke et område. | Bruk et mer presist navn, eller tegn området selv (måte 2). |
 | `FEIL: Området er … km², over grensen` | Området er for stort. | Velg et mindre område, eller øk `maks_areal_km2`, se [punkt 9](#9-andre-innstillinger). |
 | `FEIL: … finnes allerede og er ikke laget av dette skriptet` | Det finnes en annen fil med samme navn i mappen. | Gi resultatet et annet navn med `fil = "nytt_navn.gpkg"` i innstillingene. |
 | `FEIL: Får ikke skrevet til …` | Filen er åpen i QGIS. | Fjern lagene fra QGIS, eller lukk QGIS, og kjør på nytt. |
 | `DLL load failed` | Du bruker ikke OSGeo4W Shell. | Åpne **OSGeo4W Shell** og prøv igjen. |
+| `svarer ikke, prøver neste` | En av OpenStreetMap-maskinene svarer ikke. | Ingenting. Skriptet prøver selv neste maskin. |
+| `ADVARSEL: Fikk ikke kontakt med noen Overpass-server` | Ingen av OpenStreetMap-maskinene svarer. | Sjekk at du er på nett. Vent 10–15 minutter og prøv igjen. |
+| `FEIL: overpass_url må være en https-adresse` | Feil i `overpass_url` i innstillingene. | Sett den tilbake til `overpass_url = ""`. |
 | `429`, `Too Many Requests`, `timed out` eller `NVDB svarte 5…` | Tjenesten er opptatt eller nede. | Vent noen minutter og prøv igjen. |
 
 Kommer du ikke videre: ta skjermbilde av terminalen og send det til den som ga deg skriptet.
@@ -387,6 +395,7 @@ tilfeller.
 | `fil` | `""` | Navn på resultatfilen, f.eks. `"molde_2019.gpkg"`. Tomt betyr navn fra området. |
 | `crs` | `"auto"` | Koordinatsystem. `"auto"` velger riktig UTM-sone for Norge. |
 | `ulykker_fil` | `""` | Bruk ulykkesdata fra en fil i stedet for å hente fra Statens vegvesen. |
+| `overpass_url` | `""` | Hvilken OpenStreetMap-server som skal prøves først. La den stå tom. |
 
 Et typisk eksempel er å bare ta med de siste fem årene:
 

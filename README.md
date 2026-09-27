@@ -33,7 +33,7 @@ pip install -r requirements.txt
 python kryss_screening.py
 ```
 
-Resultatet havner i mappen du kjører fra, f.eks. `molde.gpkg` og `molde.csv`. Dra
+Resultatet havner i mappen du kjører fra, f.eks. `grunerlokka.gpkg` og `grunerlokka.csv`. Dra
 GeoPackage-filen inn i QGIS, så får lagene riktige farger automatisk.
 
 ## Velg analyseområde
@@ -47,6 +47,11 @@ Området settes i `[omrade]` i `innstillinger.toml`. Bruk **én** av tre måter:
 ```toml
 sted = "Grünerløkka, Oslo"
 ```
+
+Bydeler som `"Frogner, Oslo"`, `"Bergenhus, Bergen"` og `"Tromsøya"` passer godt. Et bynavn
+alene gir hele kommunen, som ofte er for stor: `"Molde"` blir nesten 2 000 km² fordi fjell og
+sjø er med. Navn som «Molde sentrum» finnes ikke som område i OpenStreetMap. Bruk polygonfil
+eller boks for slike områder.
 
 **2. Polygonfil**: tegn området selv i QGIS og lagre som GeoPackage, GeoJSON eller Shape.
 Alle flater i laget slås sammen.
@@ -66,7 +71,7 @@ boks = [10.74, 59.91, 10.80, 59.94]
 Du kan også overstyre området fra kommandolinjen uten å endre filen:
 
 ```bash
-python kryss_screening.py --sted "Molde sentrum"
+python kryss_screening.py --sted "Frogner, Oslo"
 python kryss_screening.py --polygon-fil mitt_omrade.gpkg
 python kryss_screening.py --boks 10.74 59.91 10.80 59.94
 ```
@@ -83,6 +88,17 @@ python kryss_screening.py --boks 10.74 59.91 10.80 59.94
 | `fil` | `""` | Navn på utfilen (må slutte på `.gpkg`). Tomt betyr navn fra området. |
 | `crs` | `"auto"` | Koordinatsystem. `auto` velger ETRS89 / UTM 32, 33 eller 35 etter hvor området ligger. |
 | `ulykker_fil` | `""` | Ulykkesdata fra fil, f.eks. fra Geonorge, i stedet for NVDB-APIet. |
+| `overpass_url` | `""` | Egen Overpass-server som prøves før `overpass-api.de`. Må være en `https`-adresse. Tomt betyr bare `overpass-api.de`. |
+
+**Overpass-servere:** Vegnettet hentes fra Overpass på `overpass-api.de`, som er gratis og
+drives av frivillige. Tjenesten består av flere maskiner bak samme navn. Skriptet tester hver av
+dem med kort tidsgrense og bruker den første som svarer, slik at én maskin som er nede ikke
+stopper kjøringen.
+
+Skriptet bruker ingen andre servere automatisk. Vil du ha en reserve, sett `overpass_url` til en
+server du stoler på. Offentlige servere er listet på
+[OSM-wikien](https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances).
+Husk at den som driver serveren, ser både analyseområdet og IP-adressen din.
 
 Kjør `python kryss_screening.py --help` for alle valg på kommandolinjen.
 

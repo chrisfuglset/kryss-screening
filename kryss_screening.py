@@ -21,7 +21,7 @@ Analyseområdet og øvrige valg settes i innstillinger.toml. Se README.md.
 
 Bruk:
     python kryss_screening.py                          # bruker innstillinger.toml
-    python kryss_screening.py --sted "Molde sentrum"   # overstyrer området
+    python kryss_screening.py --sted "Frogner, Oslo"    # overstyrer området
     python kryss_screening.py --boks 10.74 59.91 10.80 59.94
     python kryss_screening.py --polygon-fil mitt_omrade.gpkg
     python kryss_screening.py --help
@@ -32,10 +32,12 @@ from __future__ import annotations
 import argparse
 import math
 import re
+import socket
 import sys
 import time
 import tomllib
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import geopandas as gpd
 import networkx as nx
@@ -60,6 +62,9 @@ CRS_GEO = "EPSG:4326"
 NVDB_CRS = "EPSG:25833"  # NVDB tolker kartutsnitt i UTM 33 uansett srid, så vi henter i 33
 NVDB_URL = "https://nvdbapiles.atlas.vegvesen.no/vegobjekter/api/v4/vegobjekter"
 NVDB_KLIENT = "kryss-screening"
+# Overpass-tjenesten for OSM-data. Den er flere maskiner bak samme navn, og hver testes for seg.
+# Andre servere brukes bare hvis brukeren selv velger dem med overpass_url.
+OVERPASS_URL = "https://overpass-api.de/api"
 NORGE_BOKS = box(4.0, 57.8, 31.5, 71.5)  # grov boks (lon/lat), bare for en advarsel
 # Gatenettet hentes så langt utenfor området at kryss på grensen får alle armene sine
 KANTSONE_M = 200
@@ -73,7 +78,7 @@ STANDARDVERDIER = {
     "analyse": {"fra_aar": 0, "toleranse_m": 15.0, "radius_m": 30.0,
                 "adt_buffer_m": 10.0, "maks_areal_km2": 500.0},
     "utdata": {"fil": "", "crs": "auto"},
-    "kilder": {"ulykker_fil": ""},
+    "kilder": {"ulykker_fil": "", "overpass_url": ""},
 }
 
 # Rangering av OSM-vegklasser (lavere tall = viktigere veg)
@@ -244,6 +249,65 @@ def kontroller_omrade(omrade, crs: str, maks_areal_km2: float) -> None:
 # --------------------------------------------------------------------------
 # 1. Gatenett fra OSM
 # --------------------------------------------------------------------------
+
+_EKTE_GETADDRINFO = socket.getaddrinfo
+_EKTE_GETHOSTBYNAME = socket.gethostbyname
+
+
+def las_vertsnavn(vert: str, ip: str) -> None:
+    """Får alle oppslag av vertsnavnet, også de OSMnx gjør, til å gå til én bestemt IP-adresse."""
+    def getaddrinfo(host, *args, **kwargs):
+        return _EKTE_GETADDRINFO(ip if host == vert else host, *args, **kwargs)
+
+    def gethostbyname(host):
+        return ip if host == vert else _EKTE_GETHOSTBYNAME(host)
+
+    socket.getaddrinfo = getaddrinfo
+    socket.gethostbyname = gethostbyname
+
+
+def kontroller_overpass_url(url: str) -> None:
+    deler = urlsplit(url)
+    if url and (deler.scheme != "https" or not deler.hostname):
+        raise ValueError(f"overpass_url må være en https-adresse, f.eks. \"{OVERPASS_URL}\" "
+                         f"(fikk «{url}»).")
+
+
+def velg_overpass(foretrukket: str) -> None:
+    """
+    Finner en Overpass-server som svarer, og låser OSMnx til den. Brukerens egen server
+    (overpass_url) prøves først, deretter overpass-api.de.
+
+    overpass-api.de er flere maskiner bak samme navn. OSMnx slår opp én av dem og venter i
+    180 s hvis den ikke svarer, uten å prøve de andre. Her testes hver adresse med kort
+    tidsgrense, og den første som svarer brukes.
+    """
+    kandidater = list(dict.fromkeys(([foretrukket] if foretrukket else []) + [OVERPASS_URL]))
+    for url in kandidater:
+        vert = urlsplit(url).hostname
+        try:
+            adresser = list(dict.fromkeys(
+                a[4][0] for a in _EKTE_GETADDRINFO(vert, 443, 0, socket.SOCK_STREAM)))
+        except socket.gaierror:
+            logg(f"  Fant ikke {vert} i DNS, prøver neste")
+            continue
+        for ip in adresser:
+            las_vertsnavn(vert, ip)
+            try:
+                svar = requests.get(f"{url.rstrip('/')}/status", timeout=(10, 30),
+                                    headers={"User-Agent": ox.settings.http_user_agent})
+                svar.raise_for_status()
+            except requests.RequestException:
+                logg(f"  {vert} ({ip}) svarer ikke, prøver neste")
+                continue
+            ox.settings.overpass_url = url
+            logg(f"Bruker Overpass-serveren {vert} ({ip})")
+            return
+    socket.getaddrinfo, socket.gethostbyname = _EKTE_GETADDRINFO, _EKTE_GETHOSTBYNAME
+    logg("ADVARSEL: Fikk ikke kontakt med noen Overpass-server. Prøver likevel, noe som går bra "
+         "hvis området er hentet før. Ellers: sjekk internettforbindelsen, eller vent noen "
+         "minutter og prøv igjen.")
+
 
 def hent_gatenett(omrade, crs: str) -> nx.MultiDiGraph:
     ox.settings.use_cache = True
@@ -555,7 +619,7 @@ def les_argumenter() -> argparse.Namespace:
     p.add_argument("--innstillinger", type=Path, default=STANDARD_INNSTILLINGER,
                    help="Innstillingsfil (standard: innstillinger.toml ved siden av skriptet)")
     omr = p.add_mutually_exclusive_group()
-    omr.add_argument("--sted", help="Stedsnavn, f.eks. \"Grünerløkka, Oslo\" eller \"Molde\"")
+    omr.add_argument("--sted", help="Stedsnavn, f.eks. \"Grünerløkka, Oslo\" eller \"Tromsøya\"")
     omr.add_argument("--polygon-fil", help="Fil med polygon for analyseområdet (GPKG/GeoJSON/SHP)")
     omr.add_argument("--boks", nargs=4, type=float, metavar=("VEST", "SØR", "ØST", "NORD"),
                      help="Boks i lengde-/breddegrader")
@@ -586,6 +650,7 @@ def main() -> int:
         kontroller_omrade(omrade, crs, ana["maks_areal_km2"])
         ut = Path(args.ut or utd["fil"] or f"{navn}.gpkg")
         kontroller_utfil(ut, args.overskriv)
+        kontroller_overpass_url(kil["overpass_url"])
     except (ValueError, FileNotFoundError) as feil:
         logg(f"FEIL: {feil}")
         return 1
@@ -594,6 +659,7 @@ def main() -> int:
     med_kantsone = omrade_utm.buffer(KANTSONE_M).to_crs(CRS_GEO).iloc[0]
     omrade_utm = omrade_utm.iloc[0]
 
+    velg_overpass(kil["overpass_url"])
     Gp = hent_gatenett(med_kantsone, crs)
     kryss = lag_kryss(Gp, ana["toleranse_m"])
     if not kryss.intersects(omrade_utm).any():

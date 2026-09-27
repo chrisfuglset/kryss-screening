@@ -36,3 +36,4 @@ crs = "auto"              # "auto" = ETRS89 / UTM 32, 33 eller 35 etter hvor omr
 
 [kilder]
 ulykker_fil = ""          # valgfritt: ulykkesdata fra fil (f.eks. fra Geonorge) i stedet for NVDB
+overpass_url = ""         # valgfritt: egen Overpass-server (https) som prøves før overpass-api.de
